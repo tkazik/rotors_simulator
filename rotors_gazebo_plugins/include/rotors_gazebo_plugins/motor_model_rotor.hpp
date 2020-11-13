@@ -18,8 +18,8 @@
  * limitations under the License.
  */
 
-#ifndef ROTORS_GAZEBO_PLUGINS_SINGLE_MOTOR_MODEL_H
-#define ROTORS_GAZEBO_PLUGINS_SINGLE_MOTOR_MODEL_H
+#ifndef ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_ROTOR_H
+#define ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_ROTOR_H
 
 // SYSTEM
 // #include <stdio.h>
@@ -36,41 +36,18 @@
 #include "rotors_gazebo_plugins/common.h"
 #include "rotors_gazebo_plugins/motor_model.hpp"
 
-namespace spin {
-const static int CCW = 1;
-const static int CW = -1;
-}  // namespace spin
-
-enum class MotorType { kVelocity, kPosition, kForce };
-
 namespace gazebo {
 
-static constexpr double kDefaultMotorConstant = 8.55e-06;
-static constexpr double kDefaultMomentConstant = 0.016;
-static constexpr double kDefaultTimeConstantUp = 1.0 / 80.0;
-static constexpr double kDefaultTimeConstantDown = 1.0 / 40.0;
-static constexpr double kDefaultMaxRotVelocity = 838.0;
-static constexpr double kDefaultMinRotVelocity = 100.0;
-static constexpr double kDefaultMaxRotPosition = -M_PI;
-static constexpr double kDefaultMinRotPosition = M_PI;
-static constexpr double kDefaultPositionOffset = 0.0;
-static constexpr double kDefaultRotorDragCoefficient = 1.0e-4;
-static constexpr double kDefaultRollingMomentCoefficient = 1.0e-6;
-
-class SingleMotorModel : public MotorModel {
+class MotorModelRotor : public MotorModel {
  public:
-  SingleMotorModel(const sdf::ElementPtr _motor, const physics::JointPtr _joint,
+  MotorModelRotor(const sdf::ElementPtr _motor, const physics::JointPtr _joint,
                    const physics::LinkPtr _link)
       : MotorModel(),
-        type_(MotorType::kVelocity),
         spin_direction_(spin::CCW),
         time_constant_up_(kDefaultTimeConstantUp),
         time_constant_down_(kDefaultTimeConstantDown),
         max_rot_velocity_(kDefaultMaxRotVelocity),
         min_rot_velocity_(kDefaultMinRotVelocity),
-        max_rot_position_(kDefaultMaxRotPosition),
-        min_rot_position_(kDefaultMinRotPosition),
-        position_zero_offset_(kDefaultPositionOffset),
         motor_constant_(kDefaultMotorConstant),
         moment_constant_(kDefaultMomentConstant),
         rotor_drag_coefficient_(kDefaultRotorDragCoefficient),
@@ -82,7 +59,7 @@ class SingleMotorModel : public MotorModel {
     InitializeParams();
   }
 
-  virtual ~SingleMotorModel() {}
+  virtual ~MotorModelRotor() {}
 
   void GetActuatorState(/*&position, &velocity, &effort*/){
     // Returns actuator position, velocity and effort
@@ -97,7 +74,6 @@ class SingleMotorModel : public MotorModel {
 
  protected:
   // Parameters
-  MotorType type_;
   std::string joint_name_;
   std::string link_name_;
   int spin_direction_;
@@ -109,32 +85,13 @@ class SingleMotorModel : public MotorModel {
   double moment_constant_;
   double rotor_drag_coefficient_;
   double rolling_moment_coefficient_;
-  double max_rot_position_;
-  double min_rot_position_;
-  double position_zero_offset_;
   double rotor_velocity_slowdown_sim_;
-  // TODO: add pids, torque limits
 
   sdf::ElementPtr motor_;
   physics::JointPtr joint_;
   physics::LinkPtr link_;
 
   void InitializeParams() {
-    // Check motor type.
-    if (motor_->HasElement("motorType")) {
-      std::string motor_type =
-          motor_->GetElement("motorType")->Get<std::string>();
-      if (motor_type == "velocity")
-        type_ = MotorType::kVelocity;
-      else if (motor_type == "position")
-        type_ = MotorType::kPosition;
-      else if (motor_type == "force") {
-        type_ = MotorType::kForce;
-      } else
-        gzwarn << "[single_motor] motorType not valid, using velocity.\n";
-    } else {
-      gzwarn << "[single_motor] motorType not specified, using velocity.\n";
-    }
 
     // Check spin direction.
     if (motor_->HasElement("spinDirection")) {
@@ -156,14 +113,8 @@ class SingleMotorModel : public MotorModel {
                         rolling_moment_coefficient_);
     getSdfParam<double>(motor_, "maxRotVelocity", max_rot_velocity_,
                         max_rot_velocity_);
-    getSdfParam<double>(motor_, "maxRotVelocity", min_rot_velocity_,
+    getSdfParam<double>(motor_, "minRotVelocity", min_rot_velocity_,
                         min_rot_velocity_);
-    getSdfParam<double>(motor_, "maxRotPosition", max_rot_position_,
-                        max_rot_position_);
-    getSdfParam<double>(motor_, "maxRotPosition", min_rot_position_,
-                        min_rot_position_);
-    getSdfParam<double>(motor_, "zeroOffset", position_zero_offset_,
-                        position_zero_offset_);
     getSdfParam<double>(motor_, "motorConstant", motor_constant_,
                         motor_constant_);
     getSdfParam<double>(motor_, "momentConstant", moment_constant_,
@@ -185,4 +136,4 @@ class SingleMotorModel : public MotorModel {
 
 }  // namespace gazebo
 
-#endif  // ROTORS_GAZEBO_PLUGINS_SINGLE_MOTOR_MODEL_H
+#endif  // ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_ROTOR_H

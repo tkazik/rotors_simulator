@@ -1,9 +1,9 @@
 #ifndef ROTORS_GAZEBO_PLUGINS_MULTIMOTOR_PLUGIN_H
 #define ROTORS_GAZEBO_PLUGINS_MULTIMOTOR_PLUGIN_H
 
-#include <boost/bind.hpp>
-#include <Eigen/Eigen>
 #include <stdio.h>
+#include <Eigen/Eigen>
+#include <boost/bind.hpp>
 
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/gazebo.hh>
@@ -11,16 +11,18 @@
 
 #include <mav_msgs/default_topics.h>  // This comes from the mav_comm repo
 #include "Actuators.pb.h"
-#include "rotors_gazebo_plugins/common.h"
-#include "rotors_gazebo_plugins/single_motor_model.hpp"
 #include "ConnectGazeboToRosTopic.pb.h"
 #include "ConnectRosToGazeboTopic.pb.h"
+#include "rotors_gazebo_plugins/common.h"
+#include "rotors_gazebo_plugins/motor_model_rotor.hpp"
+#include "rotors_gazebo_plugins/motor_model_servo.hpp"
 
 namespace gazebo {
 
 static const std::string kDefaultMotorStateTopic = "gazebo/motor_states/";
 
-typedef const boost::shared_ptr<const gz_sensor_msgs::Actuators> GzActuatorsMsgPtr;
+typedef const boost::shared_ptr<const gz_sensor_msgs::Actuators>
+    GzActuatorsMsgPtr;
 
 class GazeboMultimotorPlugin : public ModelPlugin {
  public:
@@ -30,11 +32,12 @@ class GazeboMultimotorPlugin : public ModelPlugin {
         pubs_and_subs_created_(false),
         namespace_(kDefaultNamespace),
         motor_state_pub_topic_(kDefaultMotorStateTopic),
-        command_actuator_sub_topic_(mav_msgs::default_topics::COMMAND_ACTUATORS),
+        command_actuator_sub_topic_(
+            mav_msgs::default_topics::COMMAND_ACTUATORS),
         //---------------
-        node_handle_(NULL){}
+        node_handle_(NULL) {}
 
-  ~GazeboMultimotorPlugin(){}
+  ~GazeboMultimotorPlugin() {}
 
   void Publish();
 
@@ -48,9 +51,9 @@ class GazeboMultimotorPlugin : public ModelPlugin {
   bool pubs_and_subs_created_;
   void CreatePubsAndSubs();
   void CommandMotorCallback(GzActuatorsMsgPtr& actuators_msg);
-  bool GetValidMotor(const sdf::ElementPtr motor,
-                                           physics::JointPtr joint,
-                                           physics::LinkPtr link);
+  bool GetValidMotor(const sdf::ElementPtr motor, physics::JointPtr joint,
+                     physics::LinkPtr link);
+  bool GetMotorType(const sdf::ElementPtr motor, std::string* motor_type);
 
   //===== VARIABLES READ FROM SDF FILE =====//
   std::string namespace_;
@@ -68,10 +71,9 @@ class GazeboMultimotorPlugin : public ModelPlugin {
   event::ConnectionPtr updateConnection_;
 
   // Vector of motors
-  std::vector<std::unique_ptr<SingleMotorModel>> motors_;
-
+  std::vector<std::unique_ptr<MotorModel>> motors_;
 };
 
-} // namespace gazebo
+}  // namespace gazebo
 
-#endif // ROTORS_GAZEBO_PLUGINS_MULTIMOTOR_PLUGIN_H
+#endif  // ROTORS_GAZEBO_PLUGINS_MULTIMOTOR_PLUGIN_H

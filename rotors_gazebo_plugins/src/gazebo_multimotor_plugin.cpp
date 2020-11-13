@@ -6,6 +6,8 @@ void GazeboMultimotorPlugin::Publish() {
   common::Time now = world_->SimTime();
   gz_sensor_msgs::Actuators actuator_state_msg;
 
+  // TODO: get actual state from motors
+
   for (int i = 0; i < motors_.size(); i++) {
     actuator_state_msg.add_angles((double)0);
     actuator_state_msg.add_angular_velocities((double)0);
@@ -60,10 +62,19 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
     while (motor) {
       physics::JointPtr joint;
       physics::LinkPtr link;
+      std::string motor_type;
 
       // Only load valid motors
       if (GetValidMotor(motor, joint, link)) {
-        motors_.push_back(std::make_unique<SingleMotorModel>(motor, joint, link));
+      	GetMotorType(motor, &motor_type);
+      	if(motor_type == "rotor"){
+        	motors_.push_back(std::make_unique<MotorModelRotor>(motor, joint, link));
+      	}else if(motor_type == "servo"){
+      		motors_.push_back(std::make_unique<MotorModelServo>(motor, joint, link));
+      	}else{
+      		gzwarn << "[multimotor_plugin] Type not specified, setting as rotor.\n";
+      		motors_.push_back(std::make_unique<MotorModelRotor>(motor, joint, link));
+      	}
       }
 
       motor = motor->GetNextElement("motor");
@@ -186,6 +197,18 @@ bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor, physics:
   }
   return true;
 }
+
+bool GazeboMultimotorPlugin::GetMotorType(const sdf::ElementPtr motor, std::string *motor_type) {
+  // Check that joint name and link name are valid!
+  std::string joint_name, link_name;
+  if (motor->HasElement("motorType")) {
+    *motor_type = motor->GetElement("motorType")->Get<std::string>();
+    return true;
+  }
+
+  gzerr << "[multimotor_plugin] Please specify a motor type.\n";
+  return false;
+ }
 
 GZ_REGISTER_MODEL_PLUGIN(GazeboMultimotorPlugin);
 
