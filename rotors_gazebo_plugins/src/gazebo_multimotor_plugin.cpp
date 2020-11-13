@@ -66,15 +66,19 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
 
       // Only load valid motors
       if (GetValidMotor(motor, joint, link)) {
-      	GetMotorType(motor, &motor_type);
-      	if(motor_type == "rotor"){
-        	motors_.push_back(std::make_unique<MotorModelRotor>(motor, joint, link));
-      	}else if(motor_type == "servo"){
-      		motors_.push_back(std::make_unique<MotorModelServo>(motor, joint, link));
-      	}else{
-      		gzwarn << "[multimotor_plugin] Type not specified, setting as rotor.\n";
-      		motors_.push_back(std::make_unique<MotorModelRotor>(motor, joint, link));
-      	}
+        GetMotorType(motor, &motor_type);
+        if (motor_type == "rotor") {
+          motors_.push_back(
+              std::make_unique<MotorModelRotor>(motor, joint, link));
+        } else if (motor_type == "servo") {
+          motors_.push_back(
+              std::make_unique<MotorModelServo>(motor, joint, link));
+        } else {
+          gzwarn
+              << "[multimotor_plugin] Type not specified, setting as rotor.\n";
+          motors_.push_back(
+              std::make_unique<MotorModelRotor>(motor, joint, link));
+        }
       }
 
       motor = motor->GetNextElement("motor");
@@ -159,13 +163,26 @@ void GazeboMultimotorPlugin::CreatePubsAndSubs() {
 
 void GazeboMultimotorPlugin::CommandMotorCallback(
     GzActuatorsMsgPtr &actuators_msg) {
-  
-	// TODO: update motor refs
+  int num_commands = actuators_msg->angular_velocities_size();
+  if (num_commands != motors_.size()) {
+    gzwarn << "Received " << std::to_string(num_commands)
+           << " motor commands for " << std::to_string(motors_.size())
+           << " motors.\n";
+    num_commands =
+        num_commands < motors_.size() ? num_commands : motors_.size();
+  }
+
+  for (int i = 0; i < num_commands; ++i) {
+    motors_.at(i)->SetActuatorReference(actuators_msg->angles(i),
+                                        actuators_msg->angular_velocities(i),
+                                        actuators_msg->normalized(i));
+  }
 
   received_first_reference_ = true;
 }
 
-bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor, physics::JointPtr joint,
+bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
+                                           physics::JointPtr joint,
                                            physics::LinkPtr link) {
   // Check that joint name and link name are valid!
   std::string joint_name, link_name;
@@ -198,7 +215,8 @@ bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor, physics:
   return true;
 }
 
-bool GazeboMultimotorPlugin::GetMotorType(const sdf::ElementPtr motor, std::string *motor_type) {
+bool GazeboMultimotorPlugin::GetMotorType(const sdf::ElementPtr motor,
+                                          std::string *motor_type) {
   // Check that joint name and link name are valid!
   std::string joint_name, link_name;
   if (motor->HasElement("motorType")) {
@@ -208,7 +226,7 @@ bool GazeboMultimotorPlugin::GetMotorType(const sdf::ElementPtr motor, std::stri
 
   gzerr << "[multimotor_plugin] Please specify a motor type.\n";
   return false;
- }
+}
 
 GZ_REGISTER_MODEL_PLUGIN(GazeboMultimotorPlugin);
 

@@ -74,7 +74,7 @@ class MotorModel
       *ref_effort = ref_motor_rot_effort_;
 
     }
-    void SetActuatorReference(double &ref_position, double &ref_velocity, double &ref_effort){
+    void SetActuatorReference(double ref_position, double ref_velocity, double ref_effort){
       ref_motor_rot_pos_ = ref_position;
       ref_motor_rot_vel_ = ref_velocity;
       ref_motor_rot_effort_ = ref_effort;
