@@ -2,25 +2,6 @@
 
 namespace gazebo {
 
-void GazeboMultimotorPlugin::Publish() {
-  common::Time now = world_->SimTime();
-  gz_sensor_msgs::Actuators actuator_state_msg;
-
-  // TODO: get actual state from motors
-
-  for (int i = 0; i < motors_.size(); i++) {
-    actuator_state_msg.add_angles((double)0);
-    actuator_state_msg.add_angular_velocities((double)0);
-  }
-
-  actuator_state_msg.mutable_header()->mutable_stamp()->set_sec(now.sec);
-  actuator_state_msg.mutable_header()->mutable_stamp()->set_nsec(now.nsec);
-  // Frame ID is not used for this particular message
-  actuator_state_msg.mutable_header()->set_frame_id("");
-
-  motor_state_pub_->Publish(actuator_state_msg);
-}
-
 void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
                                   sdf::ElementPtr _sdf) {
   // Store the pointer to the model.
@@ -101,9 +82,25 @@ void GazeboMultimotorPlugin::OnUpdate(const common::UpdateInfo &) {
     return;
   }
 
-  // TODO: get updated physics.
+  gz_sensor_msgs::Actuators actuator_state_msg;
+  double position, velocity, effort;
 
-  Publish();
+  for (const auto& motor: motors_){
+  	motor->UpdatePhysics();
+  	motor->GetActuatorState(&position, &velocity, &effort);
+  	actuator_state_msg.add_angles(position);
+  	actuator_state_msg.add_angular_velocities(velocity);
+  	actuator_state_msg.add_normalized(effort);
+  }
+
+  common::Time now = world_->SimTime();
+
+  actuator_state_msg.mutable_header()->mutable_stamp()->set_sec(now.sec);
+  actuator_state_msg.mutable_header()->mutable_stamp()->set_nsec(now.nsec);
+  // Frame ID is not used for this particular message
+  actuator_state_msg.mutable_header()->set_frame_id("");
+
+  motor_state_pub_->Publish(actuator_state_msg);
 }
 
 void GazeboMultimotorPlugin::CreatePubsAndSubs() {

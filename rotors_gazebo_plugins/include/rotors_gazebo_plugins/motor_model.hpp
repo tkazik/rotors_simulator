@@ -61,19 +61,27 @@ class MotorModel
           ref_motor_rot_effort_(0.0),
           prev_sim_time_(0.0),
           sampling_time_(0.01) {}
+    
     virtual ~MotorModel() {}
+    
     void GetMotorVelocity(double &result) const {
       result = motor_rot_vel_;
     }
+
     void SetReferenceMotorVelocity(double ref_motor_rot_vel) {
       ref_motor_rot_vel_ = ref_motor_rot_vel;
     }
+
+    void UpdatePhysics(){
+      UpdateForcesAndMoments();
+    }
+
     void GetActuatorState(double *ref_position, double *ref_velocity, double *ref_effort){
       *ref_position = ref_motor_rot_pos_;
       *ref_velocity = ref_motor_rot_vel_;
       *ref_effort = ref_motor_rot_effort_;
-
     }
+
     void SetActuatorReference(double ref_position, double ref_velocity, double ref_effort){
       ref_motor_rot_pos_ = ref_position;
       ref_motor_rot_vel_ = ref_velocity;
@@ -81,6 +89,7 @@ class MotorModel
     }
 
     virtual void InitializeParams() = 0;
+    
     virtual void Publish() = 0;
 
   protected:
@@ -93,8 +102,6 @@ class MotorModel
     double prev_ref_motor_rot_vel_;
     double prev_sim_time_;
     double sampling_time_;
-
-
 
     virtual void UpdateForcesAndMoments() = 0;
 };
