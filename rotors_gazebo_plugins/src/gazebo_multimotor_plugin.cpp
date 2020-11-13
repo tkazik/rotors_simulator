@@ -72,7 +72,7 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
       boost::bind(&GazeboMultimotorPlugin::OnUpdate, this, _1));
 }
 
-void GazeboMultimotorPlugin::OnUpdate(const common::UpdateInfo &) {
+void GazeboMultimotorPlugin::OnUpdate(const common::UpdateInfo&) {
   if (!pubs_and_subs_created_) {
     CreatePubsAndSubs();
     pubs_and_subs_created_ = true;
@@ -85,12 +85,12 @@ void GazeboMultimotorPlugin::OnUpdate(const common::UpdateInfo &) {
   gz_sensor_msgs::Actuators actuator_state_msg;
   double position, velocity, effort;
 
-  for (const auto& motor: motors_){
-  	motor->UpdatePhysics();
-  	motor->GetActuatorState(&position, &velocity, &effort);
-  	actuator_state_msg.add_angles(position);
-  	actuator_state_msg.add_angular_velocities(velocity);
-  	actuator_state_msg.add_normalized(effort);
+  for (const auto& motor : motors_) {
+    motor->UpdatePhysics();
+    motor->GetActuatorState(&position, &velocity, &effort);
+    actuator_state_msg.add_angles(position);
+    actuator_state_msg.add_angular_velocities(velocity);
+    actuator_state_msg.add_normalized(effort);
   }
 
   common::Time now = world_->SimTime();
@@ -159,7 +159,7 @@ void GazeboMultimotorPlugin::CreatePubsAndSubs() {
 }
 
 void GazeboMultimotorPlugin::CommandMotorCallback(
-    GzActuatorsMsgPtr &actuators_msg) {
+    GzActuatorsMsgPtr& actuators_msg) {
   int num_commands = actuators_msg->angular_velocities_size();
   if (num_commands != motors_.size()) {
     gzwarn << "Received " << std::to_string(num_commands)
@@ -213,7 +213,7 @@ bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
 }
 
 bool GazeboMultimotorPlugin::GetMotorType(const sdf::ElementPtr motor,
-                                          std::string *motor_type) {
+                                          std::string* motor_type) {
   // Check that joint name and link name are valid!
   std::string joint_name, link_name;
   if (motor->HasElement("motorType")) {

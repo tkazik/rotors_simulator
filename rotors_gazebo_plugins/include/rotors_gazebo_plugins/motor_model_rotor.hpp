@@ -41,9 +41,9 @@ namespace gazebo {
 class MotorModelRotor : public MotorModel {
  public:
   MotorModelRotor(const sdf::ElementPtr _motor, const physics::JointPtr _joint,
-                   const physics::LinkPtr _link)
+                  const physics::LinkPtr _link)
       : MotorModel(),
-        spin_direction_(spin::CCW),
+        turning_direction_(spin::CCW),
         time_constant_up_(kDefaultTimeConstantUp),
         time_constant_down_(kDefaultTimeConstantDown),
         max_rot_velocity_(kDefaultMaxRotVelocity),
@@ -61,22 +61,11 @@ class MotorModelRotor : public MotorModel {
 
   virtual ~MotorModelRotor() {}
 
-  void GetActuatorState(/*&position, &velocity, &effort*/){
-    // Returns actuator position, velocity and effort
-    UpdateForcesAndMoments();
-    // TODO: return results.
-  }
-
-  void SetActuatorReference(/*position, velocity, effort*/){
-    // Set reference actuator position, velocity and effort (type dependent)
-    // TODO: Set refs.
-  }
-
  protected:
   // Parameters
   std::string joint_name_;
   std::string link_name_;
-  int spin_direction_;
+  int turning_direction_;
   double time_constant_up_;
   double time_constant_down_;
   double max_rot_velocity_;
@@ -87,24 +76,25 @@ class MotorModelRotor : public MotorModel {
   double rolling_moment_coefficient_;
   double rotor_velocity_slowdown_sim_;
 
+  std::unique_ptr<FirstOrderFilter<double>> rotor_velocity_filter_;
+
   sdf::ElementPtr motor_;
   physics::JointPtr joint_;
   physics::LinkPtr link_;
 
   void InitializeParams() {
-
     // Check spin direction.
     if (motor_->HasElement("spinDirection")) {
-      std::string spin_direction =
+      std::string turning_direction =
           motor_->GetElement("spinDirection")->Get<std::string>();
-      if (spin_direction == "cw")
-        spin_direction_ = spin::CW;
-      else if (spin_direction == "ccw")
-        spin_direction = spin::CCW;
+      if (turning_direction == "cw")
+        turning_direction_ = spin::CW;
+      else if (turning_direction == "ccw")
+        turning_direction = spin::CCW;
       else
-        gzerr << "[single_motor] Spin not valid, using 'ccw.'\n";
+        gzerr << "[motor_model_rotor] Spin not valid, using 'ccw.'\n";
     } else {
-      gzwarn << "[single_motor] spinDirection not specified, using ccw.\n";
+      gzwarn << "[motor_model_rotor] spinDirection not specified, using ccw.\n";
     }
     getSdfParam<double>(motor_, "rotorDragCoefficient", rotor_drag_coefficient_,
                         rotor_drag_coefficient_);
@@ -125,12 +115,75 @@ class MotorModelRotor : public MotorModel {
                         time_constant_down_);
     getSdfParam<double>(motor_, "rotorVelocitySlowdownSim",
                         rotor_velocity_slowdown_sim_, 10);
+
+    // Create the first order filter.
+    rotor_velocity_filter_.reset(new FirstOrderFilter<double>(
+        time_constant_up_, time_constant_down_, ref_motor_rot_vel_));
   }
 
-  void Publish(){} // No publishing here
+  void Publish() {}  // No publishing here
 
-  void UpdateForcesAndMoments(){
-    // TODO: add force/moment updates 
+  void UpdateForcesAndMoments() {
+    motor_rot_vel_ = joint_->GetVelocity(0);
+    if (motor_rot_vel_ / (2 * M_PI) > 1 / (2 * sampling_time_)) {
+      gzerr << "[motor_model_rotor] Aliasing on motor might occur. Consider "
+               "making smaller simulation time steps or raising the "
+               "rotor_velocity_slowdown_sim_ param.\n";
+    }
+    double real_motor_velocity = motor_rot_vel_ * rotor_velocity_slowdown_sim_;
+    // Get the direction of the rotor rotation.
+    int real_motor_velocity_sign =
+        (real_motor_velocity > 0) - (real_motor_velocity < 0);
+    // Assuming symmetric propellers (or rotors) for the thrust calculation.
+    double thrust = turning_direction_ * real_motor_velocity_sign *
+                    real_motor_velocity * real_motor_velocity * motor_constant_;
+
+    // Apply a force to the link.
+    link_->AddRelativeForce(ignition::math::Vector3d(0, 0, thrust));
+
+    // Forces from Philppe Martin's and Erwan Salaün's
+    // 2010 IEEE Conference on Robotics and Automation paper
+    // The True Role of Accelerometer Feedback in Quadrotor Control
+    // - \omega * \lambda_1 * V_A^{\perp}
+    ignition::math::Vector3d joint_axis = joint_->GlobalAxis(0);
+    ignition::math::Vector3d body_velocity_W = link_->WorldLinearVel();
+    ignition::math::Vector3d body_velocity_perpendicular =
+        body_velocity_W - (body_velocity_W.Dot(joint_axis) * joint_axis);
+    ignition::math::Vector3d air_drag = -std::abs(real_motor_velocity) *
+                                        rotor_drag_coefficient_ *
+                                        body_velocity_perpendicular;
+
+    // Apply air_drag to link.
+    link_->AddForce(air_drag);
+    // Moments get the parent link, such that the resulting torques can be
+    // applied.
+    physics::Link_V parent_links = link_->GetParentJointsLinks();
+    // The tansformation from the parent_link to the link_.
+    ignition::math::Pose3d pose_difference =
+        link_->WorldCoGPose() - parent_links.at(0)->WorldCoGPose();
+    ignition::math::Vector3d drag_torque(
+        0, 0, -turning_direction_ * thrust * moment_constant_);
+    // Transforming the drag torque into the parent frame to handle
+    // arbitrary rotor orientations.
+    ignition::math::Vector3d drag_torque_parent_frame =
+        pose_difference.Rot().RotateVector(drag_torque);
+    parent_links.at(0)->AddRelativeTorque(drag_torque_parent_frame);
+
+    ignition::math::Vector3d rolling_moment;
+    // - \omega * \mu_1 * V_A^{\perp}
+    rolling_moment = -std::abs(real_motor_velocity) *
+                     rolling_moment_coefficient_ * body_velocity_perpendicular;
+    parent_links.at(0)->AddTorque(rolling_moment);
+    // Apply the filter on the motor's velocity.
+    double ref_motor_rot_vel;
+    ref_motor_rot_vel = rotor_velocity_filter_->updateFilter(ref_motor_rot_vel_,
+                                                             sampling_time_);
+
+    // Make sure max force is set, as it may be reset to 0 by a world reset any
+    // time. (This cannot be done during Reset() because the change will be
+    // undone by the Joint's reset function afterwards.)
+    joint_->SetVelocity(0, turning_direction_ * ref_motor_rot_vel /
+                               rotor_velocity_slowdown_sim_);
   }
 };
 

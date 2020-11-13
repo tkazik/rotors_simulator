@@ -43,10 +43,10 @@ namespace gazebo {
 class MotorModelServo : public MotorModel {
  public:
   MotorModelServo(const sdf::ElementPtr _motor, const physics::JointPtr _joint,
-                   const physics::LinkPtr _link)
+                  const physics::LinkPtr _link)
       : MotorModel(),
-        type_(ControlMode::kPosition),
-        spin_direction_(spin::CCW),
+        mode_(ControlMode::kPosition),
+        turning_direction_(spin::CCW),
         max_rot_velocity_(kDefaultMaxRotVelocity),
         max_torque_(kDefaultMaxTorque),
         max_rot_position_(kDefaultMaxRotPosition),
@@ -60,28 +60,18 @@ class MotorModelServo : public MotorModel {
 
   virtual ~MotorModelServo() {}
 
-  void GetActuatorState(/*&position, &velocity, &effort*/){
-    // Returns actuator position, velocity and effort
-    UpdateForcesAndMoments();
-    // TODO: return results.
-  }
-
-  void SetActuatorReference(/*position, velocity, effort*/){
-    // Set reference actuator position, velocity and effort (type dependent)
-    // TODO: Set refs.
-  }
-
  protected:
   // Parameters
-  ControlMode type_;
+  ControlMode mode_;
   std::string joint_name_;
   std::string link_name_;
-  int spin_direction_;
+  int turning_direction_;
   double max_rot_velocity_;
   double max_torque_;
   double max_rot_position_;
   double min_rot_position_;
   double position_zero_offset_;
+  common::PID pids_;
   double p_gain_;
   double i_gain_;
   double d_gain_;
@@ -96,29 +86,31 @@ class MotorModelServo : public MotorModel {
       std::string motor_type =
           motor_->GetElement("controlMode")->Get<std::string>();
       if (motor_type == "velocity")
-        type_ = ControlMode::kVelocity;
+        mode_ = ControlMode::kVelocity;
       else if (motor_type == "position")
-        type_ = ControlMode::kPosition;
+        mode_ = ControlMode::kPosition;
       else if (motor_type == "force") {
-        type_ = ControlMode::kForce;
+        mode_ = ControlMode::kForce;
       } else
-        gzwarn << "[single_motor] controlMode not valid, using position.\n";
+        gzwarn
+            << "[motor_model_servo] controlMode not valid, using position.\n";
     } else {
-      gzwarn << "[single_motor] controlMode not specified, using position.\n";
+      gzwarn
+          << "[motor_model_servo] controlMode not specified, using position.\n";
     }
 
     // Check spin direction.
     if (motor_->HasElement("spinDirection")) {
-      std::string spin_direction =
+      std::string turning_direction =
           motor_->GetElement("spinDirection")->Get<std::string>();
-      if (spin_direction == "cw")
-        spin_direction_ = spin::CW;
-      else if (spin_direction == "ccw")
-        spin_direction = spin::CCW;
+      if (turning_direction == "cw")
+        turning_direction_ = spin::CW;
+      else if (turning_direction == "ccw")
+        turning_direction = spin::CCW;
       else
-        gzerr << "[single_motor] Spin not valid, using 'ccw.'\n";
+        gzerr << "[motor_model_servo] Spin not valid, using 'ccw.'\n";
     } else {
-      gzwarn << "[single_motor] spinDirection not specified, using ccw.\n";
+      gzwarn << "[motor_model_servo] spinDirection not specified, using ccw.\n";
     }
     getSdfParam<double>(motor_, "maxRotVelocity", max_rot_velocity_,
                         max_rot_velocity_);
@@ -128,12 +120,79 @@ class MotorModelServo : public MotorModel {
                         min_rot_position_);
     getSdfParam<double>(motor_, "zeroOffset", position_zero_offset_,
                         position_zero_offset_);
+
+    // Set up joint control PID to control joint.
+    if (motor_->HasElement("joint_control_pid")) {
+      double p, i, d, iMax, iMin, cmdMax, cmdMin;
+
+      sdf::ElementPtr pid = motor_->GetElement("joint_control_pid");
+      getSdfParam<double>(motor_, "p", p, 0.0);
+      getSdfParam<double>(motor_, "i", i, 0.0);
+      getSdfParam<double>(motor_, "d", d, 0.0);
+      getSdfParam<double>(motor_, "iMax", p, 0.0);
+      getSdfParam<double>(motor_, "iMin", iMin, 0.0);
+      getSdfParam<double>(motor_, "cmdMax", cmdMax, 0.0);
+      getSdfParam<double>(motor_, "cmdMin", cmdMin, 0.0);
+      pids_.Init(p, i, d, iMax, iMin, cmdMax, cmdMin);
+    } else {
+      pids_.Init(0, 0, 0, 0, 0, 0, 0);
+      gzerr << "[motor_model_servo] PID values not found, Setting all values "
+               "to zero!\n";
+    }
   }
 
-  void Publish(){} // No publishing here
+  void Publish() {}  // No publishing here
 
-  void UpdateForcesAndMoments(){
-    // TODO: add force/moment updates 
+  double NormalizeAngle(double input) {
+    // Constrain magnitude to be max 2*M_PI.
+    double wrapped = std::fmod(std::abs(input), 2 * M_PI);
+    wrapped = std::copysign(wrapped, input);
+
+    // Constrain result to be element of [0, 2*pi).
+    // Set angle to zero if sufficiently close to 2*pi.
+    if (std::abs(wrapped - 2 * M_PI) < 1e-8) {
+      wrapped = 0;
+    }
+
+    // Ensure angle is positive.
+    if (wrapped < 0) {
+      wrapped += 2 * M_PI;
+    }
+
+    return wrapped;
+  }
+
+  void UpdateForcesAndMoments() {
+    switch (mode_) {
+      case (ControlMode::kPosition): {
+        double err = NormalizeAngle(joint_->Position(0)) -
+                     NormalizeAngle(ref_motor_rot_pos_);
+
+        // Angles are element of [0..2pi).
+        // Constrain difference of angles to be in [-pi..pi).
+        if (err > M_PI) {
+          err -= 2 * M_PI;
+        }
+        if (err < -M_PI) {
+          err += 2 * M_PI;
+        }
+        if (std::abs(err - M_PI) < 1e-8) {
+          err = -M_PI;
+        }
+
+        double force = pids_.Update(err, sampling_time_);
+        joint_->SetForce(0, force);
+        break;
+      }
+      case (ControlMode::kForce): {
+        joint_->SetForce(0, ref_motor_rot_effort_);
+        break;
+      }
+      default:  // ControlMode::kVelocity
+      {
+        //TODO(@kajabo) Implement velocity control mode
+      }
+    }
   }
 };
 

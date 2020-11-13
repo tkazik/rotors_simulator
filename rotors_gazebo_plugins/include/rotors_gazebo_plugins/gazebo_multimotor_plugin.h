@@ -39,8 +39,6 @@ class GazeboMultimotorPlugin : public ModelPlugin {
 
   ~GazeboMultimotorPlugin() {}
 
-  void Publish();
-
  protected:
   void Load(physics::ModelPtr _model, sdf::ElementPtr _sdf);
 
