@@ -162,12 +162,15 @@ class MotorModelServo : public MotorModel {
   }
 
   void UpdateForcesAndMoments() {
+    motor_rot_pos_ = joint_->Position(0);
+    motor_rot_vel_ = joint_->GetVelocity(0);
+    motor_rot_effort_ = joint_->GetForce(0);
     switch (mode_) {
       case (ControlMode::kPosition): {
         double ref_pos = std::max(
             std::min(ref_motor_rot_pos_, max_rot_position_), min_rot_position_);
         double err =
-            NormalizeAngle(joint_->Position(0)) - NormalizeAngle(ref_pos);
+            NormalizeAngle(motor_rot_pos_) - NormalizeAngle(ref_pos);
 
         // Angles are element of [0..2pi).
         // Constrain difference of angles to be in [-pi..pi).
@@ -183,6 +186,7 @@ class MotorModelServo : public MotorModel {
         break;
       }
       case (ControlMode::kForce): {
+        // TODO(@kajabo): make motor torque feedback w gain.
         double ref_torque = std::copysign(
             ref_motor_rot_effort_,
             std::min(std::abs(ref_motor_rot_effort_), max_torque_));
@@ -193,7 +197,7 @@ class MotorModelServo : public MotorModel {
         double ref_vel = std::copysign(
             ref_motor_rot_vel_,
             std::min(std::abs(ref_motor_rot_vel_), max_rot_velocity_));
-        double err = joint_->GetVelocity(0) - ref_vel;
+        double err = motor_rot_vel_ - ref_vel;
 
         double force = pid_.Update(err, sampling_time_);
         joint_->SetForce(0, force);
