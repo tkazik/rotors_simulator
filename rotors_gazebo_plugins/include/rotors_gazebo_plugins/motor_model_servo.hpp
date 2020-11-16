@@ -71,10 +71,10 @@ class MotorModelServo : public MotorModel {
   double max_rot_position_;
   double min_rot_position_;
   double position_zero_offset_;
-  common::PID pids_;
-  double p_gain_;
-  double i_gain_;
-  double d_gain_;
+
+  // Gazebo PID implementation:
+  // https://github.com/arpg/Gazebo/blob/master/gazebo/common/PID.cc
+  common::PID pid_;
 
   sdf::ElementPtr motor_;
   physics::JointPtr joint_;
@@ -124,20 +124,19 @@ class MotorModelServo : public MotorModel {
     // Set up joint control PID to control joint.
     if (motor_->HasElement("joint_control_pid")) {
       double p, i, d, iMax, iMin, cmdMax, cmdMin;
-
       sdf::ElementPtr pid = motor_->GetElement("joint_control_pid");
-      getSdfParam<double>(motor_, "p", p, 0.0);
-      getSdfParam<double>(motor_, "i", i, 0.0);
-      getSdfParam<double>(motor_, "d", d, 0.0);
-      getSdfParam<double>(motor_, "iMax", p, 0.0);
-      getSdfParam<double>(motor_, "iMin", iMin, 0.0);
-      getSdfParam<double>(motor_, "cmdMax", cmdMax, 0.0);
-      getSdfParam<double>(motor_, "cmdMin", cmdMin, 0.0);
-      pids_.Init(p, i, d, iMax, iMin, cmdMax, cmdMin);
+      getSdfParam<double>(pid, "p", p, 0.0);
+      getSdfParam<double>(pid, "i", i, 0.0);
+      getSdfParam<double>(pid, "d", d, 0.0);
+      getSdfParam<double>(pid, "iMax", p, 0.0);
+      getSdfParam<double>(pid, "iMin", iMin, 0.0);
+      getSdfParam<double>(pid, "cmdMax", cmdMax, 0.0);
+      getSdfParam<double>(pid, "cmdMin", cmdMin, 0.0);
+      pid_.Init(p, i, d, iMax, iMin, cmdMax, cmdMin);
     } else {
-      pids_.Init(0, 0, 0, 0, 0, 0, 0);
-      gzerr << "[motor_model_servo] PID values not found, Setting all values "
-               "to zero!\n";
+      pid_.Init(0, 0, 0, 0, 0, 0, 0);
+      gzerr << "[motor_model_servo] Position PID values not found, Setting all "
+               "values to zero!\n";
     }
   }
 
@@ -165,33 +164,42 @@ class MotorModelServo : public MotorModel {
   void UpdateForcesAndMoments() {
     switch (mode_) {
       case (ControlMode::kPosition): {
-        double err = NormalizeAngle(joint_->Position(0)) -
-                     NormalizeAngle(ref_motor_rot_pos_);
+        double ref_pos = std::max(
+            std::min(ref_motor_rot_pos_, max_rot_position_), min_rot_position_);
+        double err =
+            NormalizeAngle(joint_->Position(0)) - NormalizeAngle(ref_pos);
 
         // Angles are element of [0..2pi).
         // Constrain difference of angles to be in [-pi..pi).
         if (err > M_PI) {
           err -= 2 * M_PI;
         }
-        if (err < -M_PI) {
-          err += 2 * M_PI;
-        }
         if (std::abs(err - M_PI) < 1e-8) {
-          err = -M_PI;
+          err = M_PI;
         }
 
-        double force = pids_.Update(err, sampling_time_);
+        double force = pid_.Update(err, sampling_time_);
         joint_->SetForce(0, force);
         break;
       }
       case (ControlMode::kForce): {
-        joint_->SetForce(0, ref_motor_rot_effort_);
+        double ref_torque = std::copysign(
+            ref_motor_rot_effort_,
+            std::min(std::abs(ref_motor_rot_effort_), max_torque_));
+        joint_->SetForce(0, ref_torque);
         break;
       }
-      default:  // ControlMode::kVelocity
-      {
-        //TODO(@kajabo) Implement velocity control mode
+      case (ControlMode::kVelocity): {
+        double ref_vel = std::copysign(
+            ref_motor_rot_vel_,
+            std::min(std::abs(ref_motor_rot_vel_), max_rot_velocity_));
+        double err = joint_->GetVelocity(0) - ref_vel;
+
+        double force = pid_.Update(err, sampling_time_);
+        joint_->SetForce(0, force);
+        break;
       }
+      default: {}
     }
   }
 };
