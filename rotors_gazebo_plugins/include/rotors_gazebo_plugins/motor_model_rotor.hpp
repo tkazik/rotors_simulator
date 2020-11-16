@@ -38,6 +38,11 @@
 
 namespace gazebo {
 
+// Default values from KDE885 performance data chart
+static constexpr double kDefaultMotorTorqueConst0 = 0.00218;
+static constexpr double kDefaultMotorTorqueConst1 = 0.00318;
+static constexpr double kDefaultMotorTorqueConst2 = 0.00047;
+
 class MotorModelRotor : public MotorModel {
  public:
   MotorModelRotor(const sdf::ElementPtr _motor, const physics::JointPtr _joint,
@@ -48,8 +53,11 @@ class MotorModelRotor : public MotorModel {
         time_constant_down_(kDefaultTimeConstantDown),
         max_rot_velocity_(kDefaultMaxRotVelocity),
         min_rot_velocity_(kDefaultMinRotVelocity),
-        motor_constant_(kDefaultMotorConstant),
+        thrust_constant_(kDefaultThrustConstant),
         moment_constant_(kDefaultMomentConstant),
+        motor_torque_constant0_(kDefaultMotorTorqueConst0),
+        motor_torque_constant1_(kDefaultMotorTorqueConst1),
+        motor_torque_constant2_(kDefaultMotorTorqueConst2),
         rotor_drag_coefficient_(kDefaultRotorDragCoefficient),
         rolling_moment_coefficient_(kDefaultRollingMomentCoefficient),
         rotor_velocity_slowdown_sim_(kDefaultRotorVelocitySlowdownSim) {
@@ -70,8 +78,12 @@ class MotorModelRotor : public MotorModel {
   double time_constant_down_;
   double max_rot_velocity_;
   double min_rot_velocity_;
-  double motor_constant_;
+  double thrust_constant_;
   double moment_constant_;
+  // Motor torque to thrust relation (2nd order polynomial)
+  double motor_torque_constant0_;
+  double motor_torque_constant1_;
+  double motor_torque_constant2_;
   double rotor_drag_coefficient_;
   double rolling_moment_coefficient_;
   double rotor_velocity_slowdown_sim_;
@@ -105,10 +117,16 @@ class MotorModelRotor : public MotorModel {
                         max_rot_velocity_);
     getSdfParam<double>(motor_, "minRotVelocity", min_rot_velocity_,
                         min_rot_velocity_);
-    getSdfParam<double>(motor_, "motorConstant", motor_constant_,
-                        motor_constant_);
+    getSdfParam<double>(motor_, "thrustConstant", thrust_constant_,
+                        thrust_constant_);
     getSdfParam<double>(motor_, "momentConstant", moment_constant_,
                         moment_constant_);
+    getSdfParam<double>(motor_, "motorTorqueConstant0", motor_torque_constant0_,
+                        motor_torque_constant0_);
+    getSdfParam<double>(motor_, "motorTorqueConstant1", motor_torque_constant1_,
+                        motor_torque_constant1_);
+    getSdfParam<double>(motor_, "motorTorqueConstant2", motor_torque_constant2_,
+                        motor_torque_constant2_);
     getSdfParam<double>(motor_, "timeConstantUp", time_constant_up_,
                         time_constant_up_);
     getSdfParam<double>(motor_, "timeConstantDown", time_constant_down_,
@@ -124,22 +142,28 @@ class MotorModelRotor : public MotorModel {
   void Publish() {}  // No publishing here
 
   void UpdateForcesAndMoments() {
-    motor_rot_vel_ = joint_->GetVelocity(0);
-    if (motor_rot_vel_ / (2 * M_PI) > 1 / (2 * sampling_time_)) {
+    double sim_motor_rot_vel = joint_->GetVelocity(0);
+    if (sim_motor_rot_vel / (2 * M_PI) > 1 / (2 * sampling_time_)) {
       gzerr << "[motor_model_rotor] Aliasing on motor might occur. Consider "
                "making smaller simulation time steps or raising the "
                "rotor_velocity_slowdown_sim_ param.\n";
     }
-    double real_motor_velocity = motor_rot_vel_ * rotor_velocity_slowdown_sim_;
+    motor_rot_vel_ = motor_rot_vel_ * rotor_velocity_slowdown_sim_;
     // Get the direction of the rotor rotation.
-    int real_motor_velocity_sign =
-        (real_motor_velocity > 0) - (real_motor_velocity < 0);
+    int real_motor_velocity_sign = (motor_rot_vel_ > 0) - (motor_rot_vel_ < 0);
     // Assuming symmetric propellers (or rotors) for the thrust calculation.
     double thrust = turning_direction_ * real_motor_velocity_sign *
-                    real_motor_velocity * real_motor_velocity * motor_constant_;
+                    motor_rot_vel_ * motor_rot_vel_ * thrust_constant_;
 
     // Apply a force to the link.
     link_->AddRelativeForce(ignition::math::Vector3d(0, 0, thrust));
+
+    // Compute motor effort related to thrust force. It may be better to relate
+    // this to drag torque as computed below. Collect experimental data to
+    // determine.
+    motor_rot_effort_ = motor_torque_constant0_ +
+                        motor_torque_constant1_ * std::abs(thrust) +
+                        motor_torque_constant2_ * thrust * thrust;
 
     // Forces from Philppe Martin's and Erwan Salaün's
     // 2010 IEEE Conference on Robotics and Automation paper
@@ -149,7 +173,7 @@ class MotorModelRotor : public MotorModel {
     ignition::math::Vector3d body_velocity_W = link_->WorldLinearVel();
     ignition::math::Vector3d body_velocity_perpendicular =
         body_velocity_W - (body_velocity_W.Dot(joint_axis) * joint_axis);
-    ignition::math::Vector3d air_drag = -std::abs(real_motor_velocity) *
+    ignition::math::Vector3d air_drag = -std::abs(motor_rot_vel_) *
                                         rotor_drag_coefficient_ *
                                         body_velocity_perpendicular;
 
@@ -171,8 +195,8 @@ class MotorModelRotor : public MotorModel {
 
     ignition::math::Vector3d rolling_moment;
     // - \omega * \mu_1 * V_A^{\perp}
-    rolling_moment = -std::abs(real_motor_velocity) *
-                     rolling_moment_coefficient_ * body_velocity_perpendicular;
+    rolling_moment = -std::abs(motor_rot_vel_) * rolling_moment_coefficient_ *
+                     body_velocity_perpendicular;
     parent_links.at(0)->AddTorque(rolling_moment);
     // Apply the filter on the motor's velocity.
     double ref_motor_rot_vel;
