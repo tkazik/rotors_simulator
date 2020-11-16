@@ -510,6 +510,13 @@ if(BUILD_AERIAL_MANIPULATION_PLUGINS)
   endif()
   list(APPEND targets_to_install rotors_gazebo_hebi_sea_plugin)
 
+  add_library(rotors_gazebo_forcetorque_motor_plugin SHARED src/gazebo_forcetorque_motor_plugin.cpp)
+  target_link_libraries(rotors_gazebo_forcetorque_motor_plugin ${target_linking_LIBRARIES})
+  if (NOT NO_ROS)
+    add_dependencies(rotors_gazebo_forcetorque_motor_plugin ${catkin_EXPORTED_TARGETS})
+  endif()
+  list(APPEND targets_to_install rotors_gazebo_forcetorque_motor_plugin)
+
 endif()
 
 #======================================= ODOMETRY PLUGIN ========================================//
