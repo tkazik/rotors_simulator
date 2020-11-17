@@ -1,0 +1,3 @@
+# Firefly vehicle parameters
+mass: 1.0
+inertia: {xx: 1.0, xy: 0.0, xz: 0.0, yy: 1.0, yz: 0.0, zz: 1.0}
