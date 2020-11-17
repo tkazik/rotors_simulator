@@ -21,15 +21,8 @@
 #ifndef ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_ROTOR_H
 #define ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_ROTOR_H
 
-// SYSTEM
-// #include <stdio.h>
-
 // 3RD PARTY
-// #include <boost/bind.hpp>
 #include <Eigen/Core>
-// #include <gazebo/common/common.hh>
-// #include <gazebo/common/Plugin.hh>
-// #include <gazebo/gazebo.hh>
 #include <gazebo/physics/physics.hh>
 
 // USER

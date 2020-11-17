@@ -28,47 +28,60 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
                            command_actuator_sub_topic_,
                            command_actuator_sub_topic_);
   getSdfParam<std::string>(_sdf, "actuatorStatePubTopic",
-                           motor_state_pub_topic_, motor_state_pub_topic_);
+                           motor_state_pub_topic_, 
+                           motor_state_pub_topic_);
 
-  // Add motors
-  if (_sdf->HasElement("motors")) {
-    sdf::ElementPtr motors = _sdf->GetElement("motors");
-    sdf::ElementPtr motor = motors->GetElement("motor");
+  //=============================================//
+  //========== LOAD ROTORS AND SERVOS ===========//
+  //==============================================//
+  std::string joint_name, link_name;
+  physics::JointPtr joint;
+  physics::LinkPtr link;
+  sdf::ElementPtr motor;
+  sdf::ElementPtr motors;
 
-    std::string joint_name, link_name;
+  // Add rotors.
+  if (_sdf->HasElement("rotors")) {
+    motors = _sdf->GetElement("rotors");
+    motor = motors->GetElement("rotor");
 
-    //==================================//
-    //===== Iterate through motors =====//
-    //==================================//
     while (motor) {
-      physics::JointPtr joint;
-      physics::LinkPtr link;
-      std::string motor_type;
-
       // Only load valid motors
-      if (GetValidMotor(motor, joint, link)) {
-        GetMotorType(motor, &motor_type);
-        if (motor_type == "rotor") {
-          motors_.push_back(
-              std::make_unique<MotorModelRotor>(motor, joint, link));
-        } else if (motor_type == "servo") {
-          motors_.push_back(
-              std::make_unique<MotorModelServo>(motor, joint, link));
-        } else {
-          gzwarn
-              << "[multimotor_plugin] Type not specified, setting as rotor.\n";
-          motors_.push_back(
-              std::make_unique<MotorModelRotor>(motor, joint, link));
-        }
+      if (GetValidMotor(motor, joint, link) && link) {
+        motors_.push_back(
+            std::make_unique<MotorModelRotor>(motor, joint, link));
+        gzdbg << "[gazebo_multimotor_plugin] Loaded rotor!\n";
+      }else{
+        gzdbg << "[gazebo_multimotor_plugin] Failed to load rotor!\n";
       }
-
-      motor = motor->GetNextElement("motor");
+      motor = motor->GetNextElement("rotor");
     }
   }
 
-  // Listen to the update event. This event is broadcast every
-  // simulation iteration.
-  updateConnection_ = event::Events::ConnectWorldUpdateBegin(
+  // Add servos.
+  if (_sdf->HasElement("servos")) {
+    motors = _sdf->GetElement("servos");
+    motor = motors->GetElement("servo");
+
+    while (motor) {
+      // Only load valid motors
+      if (GetValidMotor(motor, joint, link)) {
+        motors_.push_back(
+            std::make_unique<MotorModelServo>(motor, joint, link));
+        gzdbg << "[gazebo_multimotor_plugin] Loaded servo!\n";
+      }else{
+        gzdbg << "[gazebo_multimotor_plugin] Failed to load servo!\n";
+      }
+
+      motor = motor->GetNextElement("servo");
+    }
+  }
+  gzdbg << "[gazebo_multimotor_plugin] Loaded " << motors_.size()
+        << " actuators.";
+
+      // Listen to the update event. This event is broadcast every
+      // simulation iteration.
+      updateConnection_ = event::Events::ConnectWorldUpdateBegin(
       boost::bind(&GazeboMultimotorPlugin::OnUpdate, this, _1));
 }
 
@@ -200,29 +213,10 @@ bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
   if (motor->HasElement("linkName")) {
     std::string link_name = motor->GetElement("linkName")->Get<std::string>();
     link = model_->GetLink(link_name);
-    if (link == NULL) {
-      gzthrow("[multimotor_plugin] Couldn't find specified link \"" << link_name
-                                                                    << "\".");
-      return false;
-    }
   } else {
-    gzerr << "[multimotor_plugin] Please specify a linkName of the rotor.\n";
-    return false;
+    link = NULL;
   }
   return true;
-}
-
-bool GazeboMultimotorPlugin::GetMotorType(const sdf::ElementPtr motor,
-                                          std::string* motor_type) {
-  // Check that joint name and link name are valid!
-  std::string joint_name, link_name;
-  if (motor->HasElement("motorType")) {
-    *motor_type = motor->GetElement("motorType")->Get<std::string>();
-    return true;
-  }
-
-  gzerr << "[multimotor_plugin] Please specify a motor type.\n";
-  return false;
 }
 
 GZ_REGISTER_MODEL_PLUGIN(GazeboMultimotorPlugin);

@@ -27,9 +27,6 @@
 // 3RD PARTY
 // #include <boost/bind.hpp>
 #include <Eigen/Core>
-// #include <gazebo/common/common.hh>
-// #include <gazebo/common/Plugin.hh>
-// #include <gazebo/gazebo.hh>
 #include <gazebo/physics/physics.hh>
 
 // USER
@@ -54,7 +51,6 @@ class MotorModelServo : public MotorModel {
         position_zero_offset_(kDefaultPositionOffset) {
     motor_ = _motor;
     joint_ = _joint;
-    link_ = _link;
     InitializeParams();
   }
 
@@ -64,7 +60,6 @@ class MotorModelServo : public MotorModel {
   // Parameters
   ControlMode mode_;
   std::string joint_name_;
-  std::string link_name_;
   int turning_direction_;
   double max_rot_velocity_;
   double max_torque_;
@@ -78,7 +73,6 @@ class MotorModelServo : public MotorModel {
 
   sdf::ElementPtr motor_;
   physics::JointPtr joint_;
-  physics::LinkPtr link_;
 
   void InitializeParams() {
     // Check motor type.
@@ -116,7 +110,7 @@ class MotorModelServo : public MotorModel {
                         max_rot_velocity_);
     getSdfParam<double>(motor_, "maxRotPosition", max_rot_position_,
                         max_rot_position_);
-    getSdfParam<double>(motor_, "maxRotPosition", min_rot_position_,
+    getSdfParam<double>(motor_, "minRotPosition", min_rot_position_,
                         min_rot_position_);
     getSdfParam<double>(motor_, "zeroOffset", position_zero_offset_,
                         position_zero_offset_);
@@ -182,7 +176,7 @@ class MotorModelServo : public MotorModel {
         }
 
         double force = pid_.Update(err, sampling_time_);
-        joint_->SetForce(0, force);
+        joint_->SetForce(0, turning_direction_ * force);
         break;
       }
       case (ControlMode::kForce): {
@@ -190,7 +184,7 @@ class MotorModelServo : public MotorModel {
         double ref_torque = std::copysign(
             ref_motor_rot_effort_,
             std::min(std::abs(ref_motor_rot_effort_), max_torque_));
-        joint_->SetForce(0, ref_torque);
+        joint_->SetForce(0, turning_direction_ * ref_torque);
         break;
       }
       case (ControlMode::kVelocity): {
@@ -200,7 +194,7 @@ class MotorModelServo : public MotorModel {
         double err = motor_rot_vel_ - ref_vel;
 
         double force = pid_.Update(err, sampling_time_);
-        joint_->SetForce(0, force);
+        joint_->SetForce(0, turning_direction_ * force);
         break;
       }
       default: {}
