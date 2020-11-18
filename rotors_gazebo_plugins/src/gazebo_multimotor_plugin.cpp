@@ -28,8 +28,7 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
                            command_actuator_sub_topic_,
                            command_actuator_sub_topic_);
   getSdfParam<std::string>(_sdf, "actuatorStatePubTopic",
-                           motor_state_pub_topic_, 
-                           motor_state_pub_topic_);
+                           motor_state_pub_topic_, motor_state_pub_topic_);
 
   //=============================================//
   //========== LOAD ROTORS AND SERVOS ===========//
@@ -47,11 +46,11 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
 
     while (motor) {
       // Only load valid motors
-      if (GetValidMotor(motor, joint, link) && link) {
+      if (GetValidMotor(motor, joint, link)) {
         motors_.push_back(
             std::make_unique<MotorModelRotor>(motor, joint, link));
         gzdbg << "[gazebo_multimotor_plugin] Loaded rotor!\n";
-      }else{
+      } else {
         gzdbg << "[gazebo_multimotor_plugin] Failed to load rotor!\n";
       }
       motor = motor->GetNextElement("rotor");
@@ -65,23 +64,21 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
 
     while (motor) {
       // Only load valid motors
-      if (GetValidMotor(motor, joint, link)) {
-        motors_.push_back(
-            std::make_unique<MotorModelServo>(motor, joint, link));
+      if (GetValidMotor(motor, joint)) {
+        motors_.push_back(std::make_unique<MotorModelServo>(motor, joint));
         gzdbg << "[gazebo_multimotor_plugin] Loaded servo!\n";
-      }else{
+      } else {
         gzdbg << "[gazebo_multimotor_plugin] Failed to load servo!\n";
       }
-
       motor = motor->GetNextElement("servo");
     }
   }
   gzdbg << "[gazebo_multimotor_plugin] Loaded " << motors_.size()
         << " actuators.";
 
-      // Listen to the update event. This event is broadcast every
-      // simulation iteration.
-      updateConnection_ = event::Events::ConnectWorldUpdateBegin(
+  // Listen to the update event. This event is broadcast every
+  // simulation iteration.
+  updateConnection_ = event::Events::ConnectWorldUpdateBegin(
       boost::bind(&GazeboMultimotorPlugin::OnUpdate, this, _1));
 }
 
@@ -195,7 +192,31 @@ bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
                                            physics::JointPtr joint,
                                            physics::LinkPtr link) {
   // Check that joint name and link name are valid!
-  std::string joint_name, link_name;
+  std::string link_name;
+
+  if (!GetValidMotor(motor, joint)) {
+    return false;
+  }
+  if (motor->HasElement("linkName")) {
+    std::string link_name = motor->GetElement("linkName")->Get<std::string>();
+    link = model_->GetLink(link_name);
+    if (link == NULL) {
+      gzthrow("[multimotor_plugin] Couldn't find specified link \"" << link_name
+                                                                    << "\".");
+      return false;
+    }
+  } else {
+    gzerr << "[multimotor_plugin] Please specify a linkName, where the "
+             "rotor is attached.\n";
+    return false;
+  }
+  return true;
+}
+
+bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
+                                           physics::JointPtr joint) {
+  // Check that joint name is valid!
+  std::string joint_name;
   if (motor->HasElement("jointName")) {
     std::string joint_name = motor->GetElement("jointName")->Get<std::string>();
     joint = model_->GetJoint(joint_name);
@@ -208,13 +229,6 @@ bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
     gzerr << "[multimotor_plugin] Please specify a jointName, where the "
              "rotor is attached.\n";
     return false;
-  }
-
-  if (motor->HasElement("linkName")) {
-    std::string link_name = motor->GetElement("linkName")->Get<std::string>();
-    link = model_->GetLink(link_name);
-  } else {
-    link = NULL;
   }
   return true;
 }
