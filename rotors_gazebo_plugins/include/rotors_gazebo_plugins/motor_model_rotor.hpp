@@ -22,8 +22,8 @@
 #define ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_ROTOR_H
 
 // 3RD PARTY
-#include <boost/bind.hpp>
 #include <Eigen/Core>
+#include <boost/bind.hpp>
 #include <gazebo/physics/physics.hh>
 
 // USER
@@ -55,7 +55,8 @@ class MotorModelRotor : public MotorModel {
         rolling_moment_coefficient_(kDefaultRollingMomentCoefficient),
         rotor_velocity_slowdown_sim_(kDefaultRotorVelocitySlowdownSim) {
     motor_ = _motor;
-    joint_ = _model->GetJoint(motor_->GetElement("jointName")->Get<std::string>());
+    joint_ =
+        _model->GetJoint(motor_->GetElement("jointName")->Get<std::string>());
     link_ = _model->GetLink(motor_->GetElement("linkName")->Get<std::string>());
     InitializeParams();
   }

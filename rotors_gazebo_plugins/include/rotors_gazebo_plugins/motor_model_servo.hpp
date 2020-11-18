@@ -22,8 +22,8 @@
 #define ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_SERVO_H
 
 // 3RD PARTY
-#include <boost/bind.hpp>
 #include <Eigen/Core>
+#include <boost/bind.hpp>
 #include <gazebo/physics/physics.hh>
 
 // USER
@@ -46,7 +46,8 @@ class MotorModelServo : public MotorModel {
         min_rot_position_(kDefaultMinRotPosition),
         position_zero_offset_(kDefaultPositionOffset) {
     motor_ = _motor;
-    joint_ = _model->GetJoint(motor_->GetElement("jointName")->Get<std::string>());
+    joint_ =
+        _model->GetJoint(motor_->GetElement("jointName")->Get<std::string>());
     InitializeParams();
   }
 
@@ -155,12 +156,12 @@ class MotorModelServo : public MotorModel {
     motor_rot_pos_ = joint_->Position(0);
     motor_rot_vel_ = joint_->GetVelocity(0);
     motor_rot_effort_ = joint_->GetForce(0);
+
     switch (mode_) {
       case (ControlMode::kPosition): {
         double ref_pos = std::max(
             std::min(ref_motor_rot_pos_, max_rot_position_), min_rot_position_);
-        double err =
-            NormalizeAngle(motor_rot_pos_) - NormalizeAngle(ref_pos);
+        double err = NormalizeAngle(motor_rot_pos_) - NormalizeAngle(ref_pos);
 
         // Angles are element of [0..2pi).
         // Constrain difference of angles to be in [-pi..pi).

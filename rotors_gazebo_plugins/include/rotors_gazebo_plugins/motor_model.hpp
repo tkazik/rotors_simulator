@@ -31,7 +31,7 @@ const static int CW = -1;
 namespace gazebo {
 static constexpr double kDefaultMotorConstant = 8.55e-06;
 // Less confusing naming, keep previous for compatibility
-static constexpr double kDefaultThrustConstant = 8.55e-06; 
+static constexpr double kDefaultThrustConstant = 8.55e-06;
 static constexpr double kDefaultMomentConstant = 0.016;
 static constexpr double kDefaultTimeConstantUp = 1.0 / 80.0;
 static constexpr double kDefaultTimeConstantDown = 1.0 / 40.0;

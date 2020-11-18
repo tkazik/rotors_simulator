@@ -43,8 +43,7 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
     while (motor) {
       // Only load valid motors
       if (IsValidLink(motor) & IsValidJoint(motor)) {
-        motors_.push_back(
-            std::make_unique<MotorModelRotor>(model_, motor));
+        motors_.push_back(std::make_unique<MotorModelRotor>(model_, motor));
         gzdbg << "[gazebo_multimotor_plugin] Loaded rotor!\n";
       } else {
         gzdbg << "[gazebo_multimotor_plugin] Failed to load rotor!\n";
