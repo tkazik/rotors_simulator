@@ -49,9 +49,8 @@ class GazeboMultimotorPlugin : public ModelPlugin {
   bool pubs_and_subs_created_;
   void CreatePubsAndSubs();
   void CommandMotorCallback(GzActuatorsMsgPtr& actuators_msg);
-  bool GetValidMotor(const sdf::ElementPtr motor, physics::JointPtr joint,
-                     physics::LinkPtr link);
-  bool GetValidMotor(const sdf::ElementPtr motor, physics::JointPtr joint);
+  bool IsValidLink(const sdf::ElementPtr motor);
+  bool IsValidJoint(const sdf::ElementPtr motor);
 
   //===== VARIABLES READ FROM SDF FILE =====//
   std::string namespace_;

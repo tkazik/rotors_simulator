@@ -41,12 +41,10 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
     sdf::ElementPtr motor = motors->GetElement("rotor");
 
     while (motor) {
-      physics::JointPtr joint;
-      physics::LinkPtr link;
       // Only load valid motors
-      if (GetValidMotor(motor, joint, link)) {
+      if (IsValidLink(motor) & IsValidJoint(motor)) {
         motors_.push_back(
-            std::make_unique<MotorModelRotor>(motor, joint, link));
+            std::make_unique<MotorModelRotor>(model_, motor));
         gzdbg << "[gazebo_multimotor_plugin] Loaded rotor!\n";
       } else {
         gzdbg << "[gazebo_multimotor_plugin] Failed to load rotor!\n";
@@ -61,11 +59,9 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
     sdf::ElementPtr motor = motors->GetElement("servo");
 
     while (motor) {
-      physics::JointPtr joint;
-      physics::LinkPtr link;
       // Only load valid motors
-      if (GetValidMotor(motor, joint)) {
-        motors_.push_back(std::make_unique<MotorModelServo>(motor, joint));
+      if (IsValidJoint(motor)) {
+        motors_.push_back(std::make_unique<MotorModelServo>(model_, motor));
         gzdbg << "[gazebo_multimotor_plugin] Loaded servo!\n";
       } else {
         gzdbg << "[gazebo_multimotor_plugin] Failed to load servo!\n";
@@ -187,18 +183,13 @@ void GazeboMultimotorPlugin::CommandMotorCallback(
   received_first_reference_ = true;
 }
 
-bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
-                                           physics::JointPtr joint,
-                                           physics::LinkPtr link) {
-  // Check that joint name and link name are valid!
+bool GazeboMultimotorPlugin::IsValidLink(const sdf::ElementPtr motor) {
+  // Check that link name is valid!
   std::string link_name;
 
-  if (!GetValidMotor(motor, joint)) {
-    return false;
-  }
   if (motor->HasElement("linkName")) {
     std::string link_name = motor->GetElement("linkName")->Get<std::string>();
-    link = model_->GetLink(link_name);
+    physics::LinkPtr link = model_->GetLink(link_name);
     if (link == NULL) {
       gzthrow("[multimotor_plugin] Couldn't find specified link \"" << link_name
                                                                     << "\".");
@@ -212,13 +203,12 @@ bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
   return true;
 }
 
-bool GazeboMultimotorPlugin::GetValidMotor(const sdf::ElementPtr motor,
-                                           physics::JointPtr joint) {
+bool GazeboMultimotorPlugin::IsValidJoint(const sdf::ElementPtr motor) {
   // Check that joint name is valid!
   std::string joint_name;
   if (motor->HasElement("jointName")) {
     std::string joint_name = motor->GetElement("jointName")->Get<std::string>();
-    joint = model_->GetJoint(joint_name);
+    physics::JointPtr joint = model_->GetJoint(joint_name);
     if (joint == NULL) {
       gzthrow("[multimotor_plugin] Couldn't find specified joint \""
               << joint_name << "\".");

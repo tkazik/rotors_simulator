@@ -36,7 +36,7 @@ namespace gazebo {
 
 class MotorModelServo : public MotorModel {
  public:
-  MotorModelServo(const sdf::ElementPtr _motor, const physics::JointPtr _joint)
+  MotorModelServo(const physics::ModelPtr _model, const sdf::ElementPtr _motor)
       : MotorModel(),
         mode_(ControlMode::kPosition),
         turning_direction_(spin::CCW),
@@ -46,7 +46,7 @@ class MotorModelServo : public MotorModel {
         min_rot_position_(kDefaultMinRotPosition),
         position_zero_offset_(kDefaultPositionOffset) {
     motor_ = _motor;
-    joint_ = _joint;
+    joint_ = _model->GetJoint(motor_->GetElement("jointName")->Get<std::string>());
     InitializeParams();
   }
 

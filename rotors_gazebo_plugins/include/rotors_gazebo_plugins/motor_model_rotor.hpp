@@ -39,8 +39,7 @@ static constexpr double kDefaultMotorTorqueConst2 = 0.00047;
 
 class MotorModelRotor : public MotorModel {
  public:
-  MotorModelRotor(const sdf::ElementPtr _motor, const physics::JointPtr _joint,
-                  const physics::LinkPtr _link)
+  MotorModelRotor(const physics::ModelPtr _model, const sdf::ElementPtr _motor)
       : MotorModel(),
         turning_direction_(spin::CCW),
         time_constant_up_(kDefaultTimeConstantUp),
@@ -56,11 +55,8 @@ class MotorModelRotor : public MotorModel {
         rolling_moment_coefficient_(kDefaultRollingMomentCoefficient),
         rotor_velocity_slowdown_sim_(kDefaultRotorVelocitySlowdownSim) {
     motor_ = _motor;
-    joint_ = _joint;
-    link_ = _link;
-    gzdbg << "[motor_model_servo]\n";
-    gzdbg << "[motor_model_servo] joint name = " << joint_->GetName() << "\n";
-    gzdbg << "[motor_model_servo] link name = " << link_->GetName() << "\n";
+    joint_ = _model->GetJoint(motor_->GetElement("jointName")->Get<std::string>());
+    link_ = _model->GetLink(motor_->GetElement("linkName")->Get<std::string>());
     InitializeParams();
   }
 
@@ -139,7 +135,6 @@ class MotorModelRotor : public MotorModel {
   void Publish() {}  // No publishing here
 
   void UpdateForcesAndMoments() {
-    gzdbg << "[motor_model_rotor] Updating forces and moments.\n";
     double sim_motor_rot_vel = joint_->GetVelocity(0);
     gzdbg << "[motor_model_rotor] Rotor sim velocity is " << sim_motor_rot_vel <<".\n";
     if (sim_motor_rot_vel / (2 * M_PI) > 1 / (2 * sampling_time_)) {
@@ -154,9 +149,9 @@ class MotorModelRotor : public MotorModel {
     double thrust = turning_direction_ * real_motor_velocity_sign *
                     motor_rot_vel_ * motor_rot_vel_ * thrust_constant_;
 
-    gzdbg << "[motor_model_rotor] Adding thrust force.\n";
     // Apply a force to the link.
     link_->AddRelativeForce(ignition::math::Vector3d(0, 0, thrust));
+    gzdbg << "[motor_model_rotor] Rotor thrust is " << thrust <<".\n";
 
     // Compute motor effort related to thrust force. It may be better to relate
     // this to drag torque as computed below. Collect experimental data to
@@ -177,7 +172,6 @@ class MotorModelRotor : public MotorModel {
                                         rotor_drag_coefficient_ *
                                         body_velocity_perpendicular;
 
-    gzdbg << "[motor_model_rotor] Adding air drag.\n";
     // Apply air_drag to link.
     link_->AddForce(air_drag);
     // Moments get the parent link, such that the resulting torques can be
@@ -188,11 +182,11 @@ class MotorModelRotor : public MotorModel {
         link_->WorldCoGPose() - parent_links.at(0)->WorldCoGPose();
     ignition::math::Vector3d drag_torque(
         0, 0, -turning_direction_ * thrust * moment_constant_);
+
     // Transforming the drag torque into the parent frame to handle
     // arbitrary rotor orientations.
     ignition::math::Vector3d drag_torque_parent_frame =
         pose_difference.Rot().RotateVector(drag_torque);
-    gzdbg << "[motor_model_rotor] Adding relative drag torque.\n";
     parent_links.at(0)->AddRelativeTorque(drag_torque_parent_frame);
 
     ignition::math::Vector3d rolling_moment;
@@ -200,7 +194,6 @@ class MotorModelRotor : public MotorModel {
     rolling_moment = -std::abs(motor_rot_vel_) * rolling_moment_coefficient_ *
                      body_velocity_perpendicular;
     parent_links.at(0)->AddTorque(rolling_moment);
-    gzdbg << "[motor_model_rotor] Adding rolling moment.\n";
 
     // Apply the filter on the motor's velocity.
     double ref_motor_rot_vel;
@@ -212,6 +205,8 @@ class MotorModelRotor : public MotorModel {
     // undone by the Joint's reset function afterwards.)
     joint_->SetVelocity(0, turning_direction_ * ref_motor_rot_vel /
                                rotor_velocity_slowdown_sim_);
+    gzdbg << "[motor_model_rotor] Applying rotor velocity " << turning_direction_ * ref_motor_rot_vel /
+                               rotor_velocity_slowdown_sim_ <<".\n";
   }
 };
 
