@@ -71,11 +71,10 @@ class MotorModel {
 
   void UpdatePhysics() { UpdateForcesAndMoments(); }
 
-  void GetActuatorState(double *ref_position, double *ref_velocity,
-                        double *ref_effort) {
-    *ref_position = ref_motor_rot_pos_;
-    *ref_velocity = ref_motor_rot_vel_;
-    *ref_effort = ref_motor_rot_effort_;
+  void GetActuatorState(double *position, double *velocity, double *effort) {
+    *position = motor_rot_pos_;
+    *velocity = motor_rot_vel_;
+    *effort = motor_rot_effort_;
   }
 
   void SetActuatorReference(double ref_position, double ref_velocity,
