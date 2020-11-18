@@ -88,11 +88,8 @@ void GazeboMultimotorPlugin::OnUpdate(const common::UpdateInfo&) {
   double position, velocity, effort;
 
   for (const auto& motor : motors_) {
-    gzdbg << "[gazebo_multimotor_plugin] Updating physics.\n";
     motor->UpdatePhysics();
-    gzdbg << "[gazebo_multimotor_plugin] Getting actuator state.\n";
     motor->GetActuatorState(&position, &velocity, &effort);
-    gzdbg << "[gazebo_multimotor_plugin] Creating actuator message.\n";
     actuator_state_msg.add_angles(position);
     actuator_state_msg.add_angular_velocities(velocity);
     actuator_state_msg.add_normalized(effort);

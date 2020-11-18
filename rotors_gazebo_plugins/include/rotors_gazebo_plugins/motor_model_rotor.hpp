@@ -136,13 +136,12 @@ class MotorModelRotor : public MotorModel {
 
   void UpdateForcesAndMoments() {
     double sim_motor_rot_vel = joint_->GetVelocity(0);
-    gzdbg << "[motor_model_rotor] Rotor sim velocity is " << sim_motor_rot_vel <<".\n";
     if (sim_motor_rot_vel / (2 * M_PI) > 1 / (2 * sampling_time_)) {
       gzerr << "[motor_model_rotor] Aliasing on motor might occur. Consider "
                "making smaller simulation time steps or raising the "
                "rotor_velocity_slowdown_sim_ param.\n";
     }
-    motor_rot_vel_ = motor_rot_vel_ * rotor_velocity_slowdown_sim_;
+    motor_rot_vel_ = sim_motor_rot_vel * rotor_velocity_slowdown_sim_;
     // Get the direction of the rotor rotation.
     int real_motor_velocity_sign = (motor_rot_vel_ > 0) - (motor_rot_vel_ < 0);
     // Assuming symmetric propellers (or rotors) for the thrust calculation.
@@ -151,7 +150,6 @@ class MotorModelRotor : public MotorModel {
 
     // Apply a force to the link.
     link_->AddRelativeForce(ignition::math::Vector3d(0, 0, thrust));
-    gzdbg << "[motor_model_rotor] Rotor thrust is " << thrust <<".\n";
 
     // Compute motor effort related to thrust force. It may be better to relate
     // this to drag torque as computed below. Collect experimental data to
@@ -205,8 +203,6 @@ class MotorModelRotor : public MotorModel {
     // undone by the Joint's reset function afterwards.)
     joint_->SetVelocity(0, turning_direction_ * ref_motor_rot_vel /
                                rotor_velocity_slowdown_sim_);
-    gzdbg << "[motor_model_rotor] Applying rotor velocity " << turning_direction_ * ref_motor_rot_vel /
-                               rotor_velocity_slowdown_sim_ <<".\n";
   }
 };
 
