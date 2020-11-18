@@ -34,17 +34,15 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
   //========== LOAD ROTORS AND SERVOS ===========//
   //==============================================//
   std::string joint_name, link_name;
-  physics::JointPtr joint;
-  physics::LinkPtr link;
-  sdf::ElementPtr motor;
-  sdf::ElementPtr motors;
 
   // Add rotors.
   if (_sdf->HasElement("rotors")) {
-    motors = _sdf->GetElement("rotors");
-    motor = motors->GetElement("rotor");
+    sdf::ElementPtr motors = _sdf->GetElement("rotors");
+    sdf::ElementPtr motor = motors->GetElement("rotor");
 
     while (motor) {
+      physics::JointPtr joint;
+      physics::LinkPtr link;
       // Only load valid motors
       if (GetValidMotor(motor, joint, link)) {
         motors_.push_back(
@@ -59,10 +57,12 @@ void GazeboMultimotorPlugin::Load(physics::ModelPtr _model,
 
   // Add servos.
   if (_sdf->HasElement("servos")) {
-    motors = _sdf->GetElement("servos");
-    motor = motors->GetElement("servo");
+    sdf::ElementPtr motors = _sdf->GetElement("servos");
+    sdf::ElementPtr motor = motors->GetElement("servo");
 
     while (motor) {
+      physics::JointPtr joint;
+      physics::LinkPtr link;
       // Only load valid motors
       if (GetValidMotor(motor, joint)) {
         motors_.push_back(std::make_unique<MotorModelServo>(motor, joint));
@@ -88,16 +88,15 @@ void GazeboMultimotorPlugin::OnUpdate(const common::UpdateInfo&) {
     pubs_and_subs_created_ = true;
   }
 
-  if (!received_first_reference_) {
-    return;
-  }
-
   gz_sensor_msgs::Actuators actuator_state_msg;
   double position, velocity, effort;
 
   for (const auto& motor : motors_) {
+    gzdbg << "[gazebo_multimotor_plugin] Updating physics.\n";
     motor->UpdatePhysics();
+    gzdbg << "[gazebo_multimotor_plugin] Getting actuator state.\n";
     motor->GetActuatorState(&position, &velocity, &effort);
+    gzdbg << "[gazebo_multimotor_plugin] Creating actuator message.\n";
     actuator_state_msg.add_angles(position);
     actuator_state_msg.add_angular_velocities(velocity);
     actuator_state_msg.add_normalized(effort);

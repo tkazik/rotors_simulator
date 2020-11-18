@@ -21,11 +21,8 @@
 #ifndef ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_SERVO_H
 #define ROTORS_GAZEBO_PLUGINS_MOTOR_MODEL_SERVO_H
 
-// SYSTEM
-// #include <stdio.h>
-
 // 3RD PARTY
-// #include <boost/bind.hpp>
+#include <boost/bind.hpp>
 #include <Eigen/Core>
 #include <gazebo/physics/physics.hh>
 
@@ -39,8 +36,7 @@ namespace gazebo {
 
 class MotorModelServo : public MotorModel {
  public:
-  MotorModelServo(const sdf::ElementPtr _motor, const physics::JointPtr _joint,
-                  const physics::LinkPtr _link)
+  MotorModelServo(const sdf::ElementPtr _motor, const physics::JointPtr _joint)
       : MotorModel(),
         mode_(ControlMode::kPosition),
         turning_direction_(spin::CCW),
