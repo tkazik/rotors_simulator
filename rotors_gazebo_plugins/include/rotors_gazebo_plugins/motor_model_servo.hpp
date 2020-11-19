@@ -119,7 +119,7 @@ class MotorModelServo : public MotorModel {
       getSdfParam<double>(pid, "p", p, 0.0);
       getSdfParam<double>(pid, "i", i, 0.0);
       getSdfParam<double>(pid, "d", d, 0.0);
-      getSdfParam<double>(pid, "iMax", p, 0.0);
+      getSdfParam<double>(pid, "iMax", iMax, 0.0);
       getSdfParam<double>(pid, "iMin", iMin, 0.0);
       getSdfParam<double>(pid, "cmdMax", cmdMax, 0.0);
       getSdfParam<double>(pid, "cmdMin", cmdMin, 0.0);
@@ -153,9 +153,9 @@ class MotorModelServo : public MotorModel {
   }
 
   void UpdateForcesAndMoments() {
-    motor_rot_pos_ = joint_->Position(0);
-    motor_rot_vel_ = joint_->GetVelocity(0);
-    motor_rot_effort_ = joint_->GetForce(0);
+    motor_rot_pos_ = turning_direction_ * joint_->Position(0);
+    motor_rot_vel_ = turning_direction_ * joint_->GetVelocity(0);
+    motor_rot_effort_ = turning_direction_ * joint_->GetForce(0);
 
     switch (mode_) {
       case (ControlMode::kPosition): {
@@ -185,12 +185,15 @@ class MotorModelServo : public MotorModel {
         break;
       }
       case (ControlMode::kVelocity): {
-        double ref_vel = std::copysign(
-            ref_motor_rot_vel_,
-            std::min(std::abs(ref_motor_rot_vel_), max_rot_velocity_));
-        double err = motor_rot_vel_ - ref_vel;
+        double ref_vel = ref_motor_rot_vel_;
+        if (ref_vel > max_rot_velocity_){
+          ref_vel = max_rot_velocity_;
+        }else if(ref_vel < -max_rot_velocity_){
+          ref_vel = -max_rot_velocity_;
+        }
 
-        double force = pid_.Update(err, sampling_time_);
+        double err = motor_rot_vel_ - ref_vel;
+        double force = pid_.Update(err * sampling_time_, sampling_time_);
         joint_->SetForce(0, turning_direction_ * force);
         break;
       }
