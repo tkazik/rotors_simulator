@@ -142,12 +142,13 @@ class MotorModelRotor : public MotorModel {
                "making smaller simulation time steps or raising the "
                "rotor_velocity_slowdown_sim_ param.\n";
     }
-    motor_rot_vel_ = sim_motor_rot_vel * rotor_velocity_slowdown_sim_;
+    double real_motor_rot_velocity = sim_motor_rot_vel * rotor_velocity_slowdown_sim_;
+    motor_rot_vel_ = turning_direction_ * real_motor_rot_velocity;
     // Get the direction of the rotor rotation.
-    int real_motor_velocity_sign = (motor_rot_vel_ > 0) - (motor_rot_vel_ < 0);
+    int real_motor_velocity_sign = (real_motor_rot_velocity > 0) - (real_motor_rot_velocity < 0);
     // Assuming symmetric propellers (or rotors) for the thrust calculation.
     double thrust = turning_direction_ * real_motor_velocity_sign *
-                    motor_rot_vel_ * motor_rot_vel_ * thrust_constant_;
+                    real_motor_rot_velocity * real_motor_rot_velocity * thrust_constant_;
 
     // Apply a force to the link.
     link_->AddRelativeForce(ignition::math::Vector3d(0, 0, thrust));
