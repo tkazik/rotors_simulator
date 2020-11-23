@@ -159,17 +159,18 @@ class MotorModelServo : public MotorModel {
 
     switch (mode_) {
       case (ControlMode::kPosition): {
-        double ref_pos = std::max(
-            std::min(ref_motor_rot_pos_, max_rot_position_), min_rot_position_);
-        double err = NormalizeAngle(motor_rot_pos_) - NormalizeAngle(ref_pos);
+        double err = NormalizeAngle(motor_rot_pos_) - NormalizeAngle(ref_motor_rot_pos_);
 
-        // Angles are element of [0..2pi).
+        // Angles are element of (-2pi..2pi).
         // Constrain difference of angles to be in [-pi..pi).
-        if (err > M_PI) {
-          err -= 2 * M_PI;
+        if (err > M_PI){
+          err -= 2*M_PI;
         }
-        if (std::abs(err - M_PI) < 1e-8) {
-          err = M_PI;
+        if (err < -M_PI){
+          err += 2*M_PI;
+        }
+        if(std::abs(err - M_PI) < 1e-8){
+          err = -M_PI;
         }
 
         double force = pid_.Update(err, sampling_time_);

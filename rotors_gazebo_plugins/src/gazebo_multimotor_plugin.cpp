@@ -205,6 +205,7 @@ bool GazeboMultimotorPlugin::IsValidJoint(const sdf::ElementPtr motor) {
   if (motor->HasElement("jointName")) {
     std::string joint_name = motor->GetElement("jointName")->Get<std::string>();
     physics::JointPtr joint = model_->GetJoint(joint_name);
+    gzdbg << "Loaded motor on joint " << joint_name << std::endl;
     if (joint == NULL) {
       gzthrow("[multimotor_plugin] Couldn't find specified joint \""
               << joint_name << "\".");
