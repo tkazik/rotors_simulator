@@ -80,7 +80,7 @@ class MotorModelServo : public MotorModel {
         mode_ = ControlMode::kVelocity;
       else if (motor_type == "position")
         mode_ = ControlMode::kPosition;
-      else if (motor_type == "force") {
+      else if (motor_type == "effort") {
         mode_ = ControlMode::kForce;
       } else
         gzwarn
