@@ -23,10 +23,15 @@
       <arg name="log_file" value="$(arg log_file)"/>
     </include>
     <node name="joy_node" pkg="joy" type="joy_node" />
-    <node name="rotors_joy_interface" pkg="rotors_joy_interface" type="rotors_joy_interface" />
+    <node name="rotors_joy_interface" pkg="rotors_joy_interface" type="rotors_joy_interface">
+      <param name="axis_roll_" value="3" />
+      <param name="axis_pitch_" value="4" />
+      <param name="axis_thrust_" value="1" />
+      <param name="axis_yaw_rate_" value="0" />
+      <param name="max_yaw_rate" value="3.14" />
+    </node>
     <node name="roll_pitch_yawrate_thrust_controller_node" pkg="rotors_control" type="roll_pitch_yawrate_thrust_controller_node" output="screen">
-      <rosparam
-        command="load" file="$(find rotors_gazebo)/resource/roll_pitch_yawrate_thrust_controller_$(arg mav_name).yaml" />
+      <rosparam command="load" file="$(find rotors_gazebo)/resource/roll_pitch_yawrate_thrust_controller_$(arg mav_name).yaml" />
       <rosparam command="load" file="$(find rotors_gazebo)/resource/$(arg mav_name).yaml" />
       <remap from="odometry" to="odometry_sensor1/odometry" />
     </node>
